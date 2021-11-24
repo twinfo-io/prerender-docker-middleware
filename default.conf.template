@@ -1,7 +1,7 @@
 server {
     listen       80;
     listen  [::]:80;
-    server_name  ${SERVER_NAME};
+    server_name  ${PRIMARY_DOMAIN};
     
     location / {
         try_files $uri @reveverse_proxy;
@@ -10,7 +10,7 @@ server {
     location @reveverse_proxy {
         set $excluded "js|css|xml|less|png|jpg|jpeg|gif|pdf|doc|txt|ico|rss|zip|mp3|rar|exe|wmv|doc|avi|ppt|mpg|mpeg|tif|wav|mov|psd|ai|xls|mp4|m4a|swf|dat|dmg|iso|flv|m4v|torrent|ttf|woff|svg|eot";
         proxy_set_header X-Prerender-Token ${PRERENDER_API_KEY};
-        proxy_set_header Host ${SERVER_NAME};
+        proxy_set_header Host ${PRIMARY_DOMAIN};
         proxy_set_header Connection "";
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 
@@ -44,12 +44,12 @@ server {
             #setting prerender as a variable forces DNS resolution since nginx caches IPs and doesnt play well with load balancing
             set $prerender "${PRERENDER_HOST}";
 
-            rewrite .* /https://${SERVER_NAME}$uri break;
+            rewrite .* /https://${PRIMARY_DOMAIN}$uri break;
             proxy_pass https://$prerender;
         }
         if ($prerender = 0) {
             #setting backend as a variable forces DNS resolution since nginx caches IPs and doesnt play well with load balancing
-            set $backend "${BACKEND_HOST}";
+            set $backend "${SECONDARY_DOMAIN}";
 
             rewrite .* $uri break;
             proxy_pass https://$backend;
