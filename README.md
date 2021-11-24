@@ -4,6 +4,8 @@ This standalone docker component can be used as a middleware to prerender your w
 
 ## How-To
 
+![Docker middleware](./res/docker-middleware.png)
+
 1. Assign a secondary domain to your website.
 
 E.g. if your website is `www.example.com` (primary domain), then point `www2.example.com` (secondary domain) to your website too.
