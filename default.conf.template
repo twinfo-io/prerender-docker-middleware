@@ -1,58 +1,100 @@
+map $http_user_agent $prerender_ua {
+    default       0;
+    "~*Prerender" 0;
+
+    "~*googlebot"                               1;
+    "~*yahoo!\ slurp"                           1;
+    "~*bingbot"                                 1;
+    "~*yandex"                                  1;
+    "~*baiduspider"                             1;
+    "~*facebookexternalhit"                     1;
+    "~*twitterbot"                              1;
+    "~*rogerbot"                                1;
+    "~*linkedinbot"                             1;
+    "~*embedly"                                 1;
+    "~*quora\ link\ preview"                    1;
+    "~*showyoubot"                              1;
+    "~*outbrain"                                1;
+    "~*pinterest\/0\."                          1;
+    "~*developers.google.com\/\+\/web\/snippet" 1;
+    "~*slackbot"                                1;
+    "~*vkshare"                                 1;
+    "~*w3c_validator"                           1;
+    "~*redditbot"                               1;
+    "~*applebot"                                1;
+    "~*whatsapp"                                1;
+    "~*flipboard"                               1;
+    "~*tumblr"                                  1;
+    "~*bitlybot"                                1;
+    "~*skypeuripreview"                         1;
+    "~*nuzzel"                                  1;
+    "~*discordbot"                              1;
+    "~*google\ page\ speed"                     1;
+    "~*qwantify"                                1;
+    "~*pinterestbot"                            1;
+    "~*bitrix\ link\ preview"                   1;
+    "~*xing-contenttabreceiver"                 1;
+    "~*chrome-lighthouse"                       1;
+    "~*telegrambot"                             1;
+}
+
+map $args $prerender_args {
+    default $prerender_ua;
+    "~(^|&)_escaped_fragment_=" 1;
+}
+
+map $http_x_prerender $x_prerender {
+    default $prerender_args;
+    "1"     0;
+}
+
+map $uri $prerender {
+    default $x_prerender;
+    "~*\.(js|css|xml|less|png|jpg|jpeg|gif|pdf|doc|txt|ico|rss|zip|mp3|rar|exe|wmv|doc|avi|ppt|mpg|mpeg|tif|wav|mov|psd|ai|xls|mp4|m4a|swf|dat|dmg|iso|flv|m4v|torrent|ttf|woff|svg|eot)" 0;
+}
+
+
 server {
     listen       80;
     listen  [::]:80;
-    server_name  ${PRIMARY_DOMAIN};
-    
-    location / {
-        try_files $uri @reveverse_proxy;
-    }
+    server_name ${PRIMARY_DOMAIN};
 
-    location @reveverse_proxy {
-        set $excluded "js|css|xml|less|png|jpg|jpeg|gif|pdf|doc|txt|ico|rss|zip|mp3|rar|exe|wmv|doc|avi|ppt|mpg|mpeg|tif|wav|mov|psd|ai|xls|mp4|m4a|swf|dat|dmg|iso|flv|m4v|torrent|ttf|woff|svg|eot";
-        proxy_set_header X-Prerender-Token ${PRERENDER_API_KEY};
-        proxy_set_header Host ${PRIMARY_DOMAIN};
+    location / {
+        if ($prerender = 1) {
+            rewrite (.*) /prerenderio last;
+        }
+
+        proxy_set_header Host $SERVER_NAME;
         proxy_set_header Connection "";
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
 
-        set $prerender 0;
-        if ($http_user_agent ~* "googlebot|bingbot|yandex|baiduspider|twitterbot|facebookexternalhit|rogerbot|linkedinbot|embedly|quora link preview|showyoubot|outbrain|pinterest\/0\.|pinterestbot|slackbot|vkShare|W3C_Validator|whatsapp|lighthouse") {
-            set $prerender 1;
-        }
-        if ($args ~ "_escaped_fragment_") {
-            set $prerender 1;
-        }
-        if ($http_user_agent ~ "Prerender") {
-            set $prerender 0;
-        }
-
-        # The default is to disable CDN caching, but we still want to
-        # let static resources cached and not prerendered
-        set $cache_header "private,max-age=600,must-revalidate";
-
-        if ($uri ~* "\.(js|css|xml|less|png|jpg|jpeg|gif|pdf|doc|txt|ico|rss|zip|mp3|rar|exe|wmv|doc|avi|ppt|mpg|mpeg|tif|wav|mov|psd|ai|xls|mp4|m4a|swf|dat|dmg|iso|flv|m4v|torrent|ttf|woff|svg|eot)") {
-            set $prerender 0;
-            set $cache_header "public,max-age=31536000";
-        }
-
         proxy_hide_header Cache-Control;
-        add_header Cache-Control $cache_header;
-        
+        add_header Cache-Control "public,max-age=31536000";
+
         #resolve using Google's DNS server to force DNS resolution and prevent caching of IPs
         resolver 8.8.8.8 8.8.4.4;
- 
-        if ($prerender = 1) {
-            #setting prerender as a variable forces DNS resolution since nginx caches IPs and doesnt play well with load balancing
-            set $prerender "${PRERENDER_HOST}";
 
-            rewrite .* /https://${PRIMARY_DOMAIN}$uri break;
-            proxy_pass https://$prerender;
-        }
+        #setting backend as a variable forces DNS resolution since nginx caches IPs and doesnt play well with load balancing
+        set $backend "${SECONDARY_DOMAIN}";
+
+        rewrite .* $uri break;
+        proxy_pass http://$backend;
+    }
+
+    location /prerenderio {
         if ($prerender = 0) {
-            #setting backend as a variable forces DNS resolution since nginx caches IPs and doesnt play well with load balancing
-            set $backend "${SECONDARY_DOMAIN}";
-
-            rewrite .* $uri break;
-            proxy_pass https://$backend;
+            return 404;
         }
+
+        proxy_set_header X-Prerender-Token ${PRERENDER_API_KEY};
+
+        proxy_hide_header Cache-Control;
+        add_header Cache-Control "private,max-age=600,must-revalidate";
+
+        #resolve using Google's DNS server to force DNS resolution and prevent caching of IPs
+        resolver 8.8.8.8 8.8.4.4;
+        set $prerenderio_host "${PRERENDER_HOST}";
+        proxy_pass http://$prerenderio_host;
+        rewrite .* /https://${PRIMARY_DOMAIN}$request_uri break;
     }
 }
