@@ -48,3 +48,5 @@ curl -A Chrome https://www.example.com
 ```bash
 curl -A Googlebot https://www.example.com
 ```
+
+> Optional: You can even set your secondary domain to be authenticated (e.g. with basic auth), so then it will never be indexed by Google, and modify the nginx config to send the authentication along with the request.
