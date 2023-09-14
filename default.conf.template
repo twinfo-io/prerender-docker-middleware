@@ -75,7 +75,7 @@ server {
         #resolver 8.8.8.8 8.8.4.4;
 
         #adicionar o DNS da VPC interna da AWS.
-        resolver 10.0.0.0 valid=10s;
+        resolver 10.0.0.2 valid=10s;
 
         #setting backend as a variable forces DNS resolution since nginx caches IPs and doesnt play well with load balancing
         set $backend "${SECONDARY_DOMAIN}";
